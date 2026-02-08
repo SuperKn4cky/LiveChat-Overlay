@@ -12,7 +12,6 @@
   };
 
   let resetTimer = null;
-  let activeObjectUrl = null;
 
   const clearTimer = () => {
     if (resetTimer) {
@@ -21,16 +20,8 @@
     }
   };
 
-  const releaseObjectUrl = () => {
-    if (activeObjectUrl) {
-      URL.revokeObjectURL(activeObjectUrl);
-      activeObjectUrl = null;
-    }
-  };
-
   const clearOverlay = () => {
     clearTimer();
-    releaseObjectUrl();
     mediaLayer.innerHTML = '';
     textLayer.innerHTML = '';
     textLayer.style.display = 'none';
@@ -135,19 +126,9 @@
     });
   };
 
-  const fetchMediaBlobUrl = async (url) => {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${overlayConfig.clientToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`media_fetch_failed_${response.status}`);
-    }
-
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
+  const buildAuthorizedMediaUrl = (url) => {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}token=${encodeURIComponent(overlayConfig.clientToken)}`;
   };
 
   const renderMedia = async (payload) => {
@@ -155,9 +136,7 @@
       return;
     }
 
-    const mediaUrl = await fetchMediaBlobUrl(payload.media.url);
-    activeObjectUrl = mediaUrl;
-
+    const mediaUrl = buildAuthorizedMediaUrl(payload.media.url);
     const element = createMediaElement(payload.media.kind);
     element.src = mediaUrl;
     mediaLayer.appendChild(element);
