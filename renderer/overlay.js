@@ -1,5 +1,6 @@
 (() => {
   const mediaLayer = document.getElementById('media-layer');
+  const tweetLayer = document.getElementById('tweet-layer');
   const authorLayer = document.getElementById('author-layer');
   const textLayer = document.getElementById('text-layer');
 
@@ -13,6 +14,7 @@
   };
 
   let resetTimer = null;
+  let twitterWidgetsPromise = null;
 
   const clearTimer = () => {
     if (resetTimer) {
@@ -24,6 +26,8 @@
   const clearOverlay = () => {
     clearTimer();
     mediaLayer.innerHTML = '';
+    tweetLayer.innerHTML = '';
+    tweetLayer.style.display = 'none';
     authorLayer.innerHTML = '';
     authorLayer.style.display = 'none';
     textLayer.innerHTML = '';
@@ -146,6 +150,73 @@
     return `${url}${separator}token=${encodeURIComponent(overlayConfig.clientToken)}`;
   };
 
+  const ensureTwitterWidgets = async () => {
+    if (window.twttr?.widgets?.load) {
+      return window.twttr;
+    }
+
+    if (twitterWidgetsPromise) {
+      return twitterWidgetsPromise;
+    }
+
+    twitterWidgetsPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://platform.twitter.com/widgets.js';
+      script.async = true;
+
+      script.onload = () => {
+        resolve(window.twttr || null);
+      };
+
+      script.onerror = () => {
+        reject(new Error('twitter_widgets_load_failed'));
+      };
+
+      document.head.appendChild(script);
+    }).catch((error) => {
+      twitterWidgetsPromise = null;
+      throw error;
+    });
+
+    return twitterWidgetsPromise;
+  };
+
+  const renderTweetCard = async (tweetCard) => {
+    if (!tweetCard?.html) {
+      return false;
+    }
+
+    tweetLayer.innerHTML = '';
+
+    const cardNode = document.createElement('div');
+    cardNode.className = 'overlay-tweet-card';
+
+    const caption = (tweetCard.caption || '').trim();
+    if (caption) {
+      const captionNode = document.createElement('div');
+      captionNode.className = 'overlay-tweet-caption';
+      captionNode.textContent = caption;
+      cardNode.appendChild(captionNode);
+    }
+
+    const embedNode = document.createElement('div');
+    embedNode.className = 'overlay-tweet-embed';
+    embedNode.innerHTML = tweetCard.html;
+
+    cardNode.appendChild(embedNode);
+    tweetLayer.appendChild(cardNode);
+    tweetLayer.style.display = 'flex';
+
+    try {
+      await ensureTwitterWidgets();
+      window.twttr?.widgets?.load(embedNode);
+    } catch (error) {
+      console.error('Twitter widgets load failed:', error);
+    }
+
+    return true;
+  };
+
   const renderMedia = async (payload) => {
     if (!payload?.media) {
       return;
@@ -178,10 +249,13 @@
   const onPlay = async (payload) => {
     clearOverlay();
 
-    applyOverlayInfo(payload);
-
     try {
-      await renderMedia(payload);
+      if (payload?.tweetCard) {
+        await renderTweetCard(payload.tweetCard);
+      } else {
+        applyOverlayInfo(payload);
+        await renderMedia(payload);
+      }
     } catch (error) {
       console.error('Media render failed:', error);
       window.livechatOverlay.reportError({

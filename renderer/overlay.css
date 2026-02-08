@@ -32,6 +32,15 @@ body {
   justify-content: center;
 }
 
+#tweet-layer {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
 #media-layer img,
 #media-layer video {
   max-width: 100%;
@@ -60,6 +69,34 @@ body {
   left: 20px;
   max-width: min(70vw, 500px);
   display: none;
+}
+
+.overlay-tweet-card {
+  width: min(92vw, 760px);
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(14, 18, 26, 0.65);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.45);
+}
+
+.overlay-tweet-caption {
+  margin: 0 0 10px;
+  color: #ffffff;
+  font-size: clamp(14px, 1.8vw, 22px);
+  font-weight: 700;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+.overlay-tweet-embed {
+  display: flex;
+  justify-content: center;
+}
+
+.overlay-tweet-embed blockquote.twitter-tweet {
+  margin: 0 !important;
 }
 
 .overlay-meta {
