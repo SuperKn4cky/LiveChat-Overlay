@@ -54,6 +54,14 @@ body {
   display: none;
 }
 
+#author-layer {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  max-width: min(70vw, 500px);
+  display: none;
+}
+
 .overlay-meta {
   display: flex;
   flex-direction: column;
@@ -71,6 +79,12 @@ body {
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
 }
 
 .overlay-author-avatar,

@@ -1,5 +1,6 @@
 (() => {
   const mediaLayer = document.getElementById('media-layer');
+  const authorLayer = document.getElementById('author-layer');
   const textLayer = document.getElementById('text-layer');
 
   let overlayConfig = {
@@ -23,6 +24,8 @@
   const clearOverlay = () => {
     clearTimer();
     mediaLayer.innerHTML = '';
+    authorLayer.innerHTML = '';
+    authorLayer.style.display = 'none';
     textLayer.innerHTML = '';
     textLayer.style.display = 'none';
   };
@@ -48,6 +51,8 @@
 
   const applyOverlayInfo = (payload) => {
     if (!overlayConfig.showText) {
+      authorLayer.innerHTML = '';
+      authorLayer.style.display = 'none';
       textLayer.innerHTML = '';
       textLayer.style.display = 'none';
       return;
@@ -62,17 +67,16 @@
     const showText = textEnabled && textValue !== '';
 
     if (!showAuthor && !showText) {
+      authorLayer.innerHTML = '';
+      authorLayer.style.display = 'none';
       textLayer.innerHTML = '';
       textLayer.style.display = 'none';
       return;
     }
 
-    textLayer.innerHTML = '';
-
-    const metaNode = document.createElement('div');
-    metaNode.className = 'overlay-meta';
-
     if (showAuthor) {
+      authorLayer.innerHTML = '';
+
       const authorNode = document.createElement('div');
       authorNode.className = 'overlay-author';
 
@@ -83,18 +87,29 @@
       authorNameNode.textContent = authorName;
       authorNode.appendChild(authorNameNode);
 
-      metaNode.appendChild(authorNode);
+      authorLayer.appendChild(authorNode);
+      authorLayer.style.display = 'block';
+    } else {
+      authorLayer.innerHTML = '';
+      authorLayer.style.display = 'none';
     }
 
     if (showText) {
+      textLayer.innerHTML = '';
+      const metaNode = document.createElement('div');
+      metaNode.className = 'overlay-meta';
+
       const textNode = document.createElement('div');
       textNode.className = 'overlay-text-value';
       textNode.textContent = textValue;
       metaNode.appendChild(textNode);
-    }
 
-    textLayer.appendChild(metaNode);
-    textLayer.style.display = 'block';
+      textLayer.appendChild(metaNode);
+      textLayer.style.display = 'block';
+    } else {
+      textLayer.innerHTML = '';
+      textLayer.style.display = 'none';
+    }
   };
 
   const createMediaElement = (kind) => {
@@ -192,6 +207,8 @@
     };
 
     if (!overlayConfig.showText) {
+      authorLayer.innerHTML = '';
+      authorLayer.style.display = 'none';
       textLayer.innerHTML = '';
       textLayer.style.display = 'none';
     }
