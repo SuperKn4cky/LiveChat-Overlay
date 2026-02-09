@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, Tray, Menu, nativeImage, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, Tray, Menu, nativeImage, globalShortcut, ipcMain, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -79,6 +79,19 @@ const TLS_ERROR_CODES = new Set([
   'ERR_TLS_CERT_ALTNAME_INVALID',
 ]);
 
+const YOUTUBE_EMBED_ORIGIN = 'https://com.overlay.client';
+
+const YOUTUBE_REQUEST_FILTER = {
+  urls: [
+    'https://youtube.com/*',
+    'https://*.youtube.com/*',
+    'https://youtu.be/*',
+    'https://*.youtube-nocookie.com/*',
+    'https://*.googlevideo.com/*',
+    'https://*.ytimg.com/*',
+  ],
+};
+
 function isLikelyTlsError(error) {
   if (!error) {
     return false;
@@ -111,6 +124,23 @@ function formatNetworkError(error, endpoint) {
   }
 
   return `network_error (${code || 'UNKNOWN'}: ${message})`;
+}
+
+function setupYouTubeRefererHeader() {
+  const currentSession = session.defaultSession;
+
+  if (!currentSession) {
+    return;
+  }
+
+  currentSession.webRequest.onBeforeSendHeaders(YOUTUBE_REQUEST_FILTER, (details, callback) => {
+    const requestHeaders = {
+      ...details.requestHeaders,
+      Referer: `${YOUTUBE_EMBED_ORIGIN}/`,
+    };
+
+    callback({ requestHeaders });
+  });
 }
 
 function httpRequestJson(url, payload, options = {}) {
@@ -572,6 +602,7 @@ ipcMain.handle('overlay:get-config', () => {
     clientToken: cfg.clientToken,
     guildId: cfg.guildId,
     clientId: cfg.clientId,
+    youtubeEmbedOrigin: YOUTUBE_EMBED_ORIGIN,
     showText: cfg.showText,
     volume: cfg.volume,
   };
@@ -664,6 +695,7 @@ ipcMain.handle('pairing:consume', async (_event, payload) => {
 });
 
 app.whenReady().then(async () => {
+  setupYouTubeRefererHeader();
   createTray();
   registerShortcuts();
 
