@@ -139,10 +139,35 @@ function setupYouTubeRefererHeader() {
   }
 
   currentSession.webRequest.onBeforeSendHeaders(YOUTUBE_REQUEST_FILTER, (details, callback) => {
-    const requestHeaders = {
-      ...details.requestHeaders,
-      Referer: `${YOUTUBE_EMBED_ORIGIN}/`,
-    };
+    const requestHeaders = { ...details.requestHeaders };
+
+    try {
+      const target = new URL(details.url);
+      const host = target.hostname.toLowerCase();
+      const isYouTubeHost =
+        host === 'youtube.com' ||
+        host.endsWith('.youtube.com') ||
+        host === 'youtu.be' ||
+        host.endsWith('.googlevideo.com') ||
+        host.endsWith('.ytimg.com') ||
+        host.endsWith('.youtube-nocookie.com');
+
+      const isTikTokHost =
+        host === 'tiktok.com' ||
+        host.endsWith('.tiktok.com') ||
+        host.endsWith('.tiktokcdn.com') ||
+        host.endsWith('.byteoversea.com') ||
+        host.endsWith('.ibyteimg.com');
+
+      if (isYouTubeHost) {
+        requestHeaders.Referer = `${YOUTUBE_EMBED_ORIGIN}/`;
+      } else if (isTikTokHost) {
+        requestHeaders.Referer = 'https://www.tiktok.com/';
+        requestHeaders.Origin = 'https://www.tiktok.com';
+      }
+    } catch {
+      requestHeaders.Referer = `${YOUTUBE_EMBED_ORIGIN}/`;
+    }
 
     callback({ requestHeaders });
   });

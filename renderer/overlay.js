@@ -154,6 +154,23 @@
     }
   };
 
+  const isLikelyDirectVideoUrl = (url) => {
+    try {
+      const parsed = new URL(url);
+      const pathname = parsed.pathname.toLowerCase();
+      const mimeType = (parsed.searchParams.get('mime_type') || '').toLowerCase();
+
+      return (
+        pathname.endsWith('.mp4') ||
+        pathname.endsWith('.m3u8') ||
+        mimeType.includes('video_mp4') ||
+        mimeType.includes('application/x-mpegurl')
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const extractYouTubeVideoId = (url) => {
     try {
       const parsed = new URL(url);
@@ -242,22 +259,46 @@
   };
 
   const createTikTokIframe = (mediaUrl) => {
-    const videoId = extractTikTokVideoId(mediaUrl);
-    if (!videoId) {
+    if (isLikelyDirectVideoUrl(mediaUrl)) {
       return null;
     }
 
-    const embedUrl = new URL(`https://www.tiktok.com/player/v1/${encodeURIComponent(videoId)}`);
-    const embedOrigin = (overlayConfig.youtubeEmbedOrigin || '').trim() || 'https://com.overlay.client';
-    embedUrl.searchParams.set('autoplay', '1');
-    embedUrl.searchParams.set('origin', embedOrigin);
+    let iframeUrl = null;
+    const videoId = extractTikTokVideoId(mediaUrl);
+
+    if (videoId) {
+      const embedUrl = new URL(`https://www.tiktok.com/player/v1/${encodeURIComponent(videoId)}`);
+      const embedOrigin = (overlayConfig.youtubeEmbedOrigin || '').trim() || 'https://com.overlay.client';
+      embedUrl.searchParams.set('autoplay', '1');
+      embedUrl.searchParams.set('origin', embedOrigin);
+      iframeUrl = embedUrl.toString();
+    } else {
+      try {
+        const parsed = new URL(mediaUrl);
+        const host = parsed.hostname.toLowerCase();
+
+        if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
+          if (parsed.pathname.startsWith('/embed') || parsed.pathname.startsWith('/player/')) {
+            iframeUrl = parsed.toString();
+          } else {
+            iframeUrl = `https://www.tiktok.com/embed?url=${encodeURIComponent(parsed.toString())}`;
+          }
+        }
+      } catch {
+        iframeUrl = null;
+      }
+    }
+
+    if (!iframeUrl) {
+      return null;
+    }
 
     const iframe = document.createElement('iframe');
     iframe.className = 'overlay-vertical-media';
     iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
     iframe.allowFullscreen = true;
     iframe.referrerPolicy = 'origin';
-    iframe.src = embedUrl.toString();
+    iframe.src = iframeUrl;
     return iframe;
   };
 
