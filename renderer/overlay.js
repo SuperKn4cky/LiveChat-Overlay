@@ -154,17 +154,33 @@
     }
   };
 
-  const isLikelyDirectVideoUrl = (url) => {
+  const isLikelyDirectVideoUrl = (url, mimeType) => {
+    const normalizedMime = typeof mimeType === 'string' ? mimeType.toLowerCase().trim() : '';
+
+    if (
+      normalizedMime &&
+      normalizedMime !== 'video/youtube' &&
+      normalizedMime !== 'video/tiktok' &&
+      (normalizedMime.startsWith('video/') || normalizedMime === 'application/x-mpegurl')
+    ) {
+      return true;
+    }
+
     try {
       const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
       const pathname = parsed.pathname.toLowerCase();
-      const mimeType = (parsed.searchParams.get('mime_type') || '').toLowerCase();
+      const mimeQuery = (parsed.searchParams.get('mime_type') || '').toLowerCase();
 
       return (
         pathname.endsWith('.mp4') ||
         pathname.endsWith('.m3u8') ||
-        mimeType.includes('video_mp4') ||
-        mimeType.includes('application/x-mpegurl')
+        pathname.includes('/video/tos/') ||
+        pathname.includes('/obj/tos/') ||
+        mimeQuery.includes('video_mp4') ||
+        mimeQuery.includes('application/x-mpegurl') ||
+        ((host === 'tiktok.com' || host.endsWith('.tiktok.com')) &&
+          (pathname.includes('/video/tos/') || pathname.includes('/obj/tos/')))
       );
     } catch {
       return false;
@@ -258,8 +274,8 @@
     return iframe;
   };
 
-  const createTikTokIframe = (mediaUrl) => {
-    if (isLikelyDirectVideoUrl(mediaUrl)) {
+  const createTikTokIframe = (mediaUrl, mimeType) => {
+    if (isLikelyDirectVideoUrl(mediaUrl, mimeType)) {
       return null;
     }
 
@@ -293,16 +309,25 @@
       return null;
     }
 
+    const wrapper = document.createElement('div');
+    wrapper.className = 'overlay-vertical-media overlay-tiktok-shell';
+
     const iframe = document.createElement('iframe');
-    iframe.className = 'overlay-vertical-media';
+    iframe.className = 'overlay-tiktok-iframe';
     iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
     iframe.allowFullscreen = true;
     iframe.referrerPolicy = 'origin';
     iframe.src = iframeUrl;
-    return iframe;
+
+    const cookieMask = document.createElement('div');
+    cookieMask.className = 'overlay-tiktok-cookie-mask';
+
+    wrapper.appendChild(iframe);
+    wrapper.appendChild(cookieMask);
+    return wrapper;
   };
 
-  const createMediaElement = (kind, mediaUrl) => {
+  const createMediaElement = (kind, mediaUrl, mimeType) => {
     if (kind === 'image') {
       const image = document.createElement('img');
       image.src = mediaUrl;
@@ -318,7 +343,7 @@
     }
 
     if (kind === 'video' && isTikTokMediaUrl(mediaUrl)) {
-      const tiktokIframe = createTikTokIframe(mediaUrl);
+      const tiktokIframe = createTikTokIframe(mediaUrl, mimeType);
 
       if (tiktokIframe) {
         return tiktokIframe;
@@ -465,7 +490,7 @@
       mediaNode.className = 'overlay-tweet-media';
 
       const mediaUrl = buildAuthorizedMediaUrl(media.url);
-      const mediaElement = createMediaElement(media.kind, mediaUrl);
+      const mediaElement = createMediaElement(media.kind, mediaUrl, media.mime);
       mediaNode.appendChild(mediaElement);
       cardNode.appendChild(mediaNode);
 
@@ -514,7 +539,7 @@
     }
 
     const mediaUrl = buildAuthorizedMediaUrl(payload.media.url);
-    const element = createMediaElement(payload.media.kind, mediaUrl);
+    const element = createMediaElement(payload.media.kind, mediaUrl, payload.media.mime);
     mediaLayer.appendChild(element);
 
     applyVolume();
