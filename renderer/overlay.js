@@ -253,6 +253,7 @@
     embedUrl.searchParams.set('origin', embedOrigin);
 
     const iframe = document.createElement('iframe');
+    iframe.className = 'overlay-vertical-media';
     iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
     iframe.allowFullscreen = true;
     iframe.referrerPolicy = 'origin';
