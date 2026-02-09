@@ -144,6 +144,16 @@
     }
   };
 
+  const isTikTokMediaUrl = (url) => {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      return host === 'tiktok.com' || host.endsWith('.tiktok.com');
+    } catch {
+      return false;
+    }
+  };
+
   const extractYouTubeVideoId = (url) => {
     try {
       const parsed = new URL(url);
@@ -176,6 +186,38 @@
     }
   };
 
+  const extractTikTokVideoId = (url) => {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      if (!(host === 'tiktok.com' || host.endsWith('.tiktok.com'))) {
+        return null;
+      }
+
+      const byQuery =
+        parsed.searchParams.get('item_id') ||
+        parsed.searchParams.get('video_id') ||
+        parsed.searchParams.get('id');
+      if (byQuery && /^\d+$/.test(byQuery)) {
+        return byQuery;
+      }
+
+      const directMatch = parsed.pathname.match(/\/video\/(\d+)/i);
+      if (directMatch?.[1]) {
+        return directMatch[1];
+      }
+
+      const embedMatch = parsed.pathname.match(/\/(?:embed\/v2|player\/v1)\/(\d+)/i);
+      if (embedMatch?.[1]) {
+        return embedMatch[1];
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const createYouTubeIframe = (mediaUrl) => {
     const videoId = extractYouTubeVideoId(mediaUrl);
     if (!videoId) {
@@ -199,6 +241,25 @@
     return iframe;
   };
 
+  const createTikTokIframe = (mediaUrl) => {
+    const videoId = extractTikTokVideoId(mediaUrl);
+    if (!videoId) {
+      return null;
+    }
+
+    const embedUrl = new URL(`https://www.tiktok.com/player/v1/${encodeURIComponent(videoId)}`);
+    const embedOrigin = (overlayConfig.youtubeEmbedOrigin || '').trim() || 'https://com.overlay.client';
+    embedUrl.searchParams.set('autoplay', '1');
+    embedUrl.searchParams.set('origin', embedOrigin);
+
+    const iframe = document.createElement('iframe');
+    iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = 'origin';
+    iframe.src = embedUrl.toString();
+    return iframe;
+  };
+
   const createMediaElement = (kind, mediaUrl) => {
     if (kind === 'image') {
       const image = document.createElement('img');
@@ -211,6 +272,14 @@
 
       if (youtubeIframe) {
         return youtubeIframe;
+      }
+    }
+
+    if (kind === 'video' && isTikTokMediaUrl(mediaUrl)) {
+      const tiktokIframe = createTikTokIframe(mediaUrl);
+
+      if (tiktokIframe) {
+        return tiktokIframe;
       }
     }
 

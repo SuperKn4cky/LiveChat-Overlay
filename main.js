@@ -89,6 +89,11 @@ const YOUTUBE_REQUEST_FILTER = {
     'https://*.youtube-nocookie.com/*',
     'https://*.googlevideo.com/*',
     'https://*.ytimg.com/*',
+    'https://tiktok.com/*',
+    'https://*.tiktok.com/*',
+    'https://*.tiktokcdn.com/*',
+    'https://*.byteoversea.com/*',
+    'https://*.ibyteimg.com/*',
   ],
 };
 
