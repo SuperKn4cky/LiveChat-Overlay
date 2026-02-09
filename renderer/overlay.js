@@ -296,7 +296,7 @@
   };
 
   const applyVolume = () => {
-    const mediaElements = mediaLayer.querySelectorAll('audio,video');
+    const mediaElements = document.querySelectorAll('#media-layer audio, #media-layer video, #tweet-layer audio, #tweet-layer video');
     mediaElements.forEach((element) => {
       try {
         element.volume = overlayConfig.volume;
@@ -401,7 +401,7 @@
     return twitterWidgetsPromise;
   };
 
-  const renderTweetCard = async (tweetCard) => {
+  const renderTweetCard = async (tweetCard, media) => {
     if (!tweetCard?.html) {
       return false;
     }
@@ -417,6 +417,36 @@
       captionNode.className = 'overlay-tweet-caption';
       captionNode.textContent = caption;
       cardNode.appendChild(captionNode);
+    }
+
+    if (media?.url && media?.kind) {
+      const mediaNode = document.createElement('div');
+      mediaNode.className = 'overlay-tweet-media';
+
+      const mediaUrl = buildAuthorizedMediaUrl(media.url);
+      const mediaElement = createMediaElement(media.kind, mediaUrl);
+      mediaNode.appendChild(mediaElement);
+      cardNode.appendChild(mediaNode);
+
+      applyVolume();
+
+      if (media.kind !== 'image') {
+        try {
+          if (typeof mediaElement.play === 'function') {
+            await mediaElement.play();
+          }
+        } catch (error) {
+          console.error('Tweet media autoplay failed:', error);
+        }
+
+        mediaElement.addEventListener(
+          'ended',
+          () => {
+            clearOverlay();
+          },
+          { once: true },
+        );
+      }
     }
 
     const embedNode = document.createElement('div');
@@ -472,7 +502,7 @@
 
     try {
       if (payload?.tweetCard) {
-        await renderTweetCard(payload.tweetCard);
+        await renderTweetCard(payload.tweetCard, payload.media);
       } else {
         applyOverlayInfo(payload);
         await renderMedia(payload);
