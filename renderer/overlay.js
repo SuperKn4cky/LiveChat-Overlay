@@ -15,6 +15,7 @@
 
   let resetTimer = null;
   let twitterWidgetsPromise = null;
+  let vidstackReadyPromise = null;
 
   const clearTimer = () => {
     if (resetTimer) {
@@ -116,11 +117,7 @@
     }
   };
 
-  const createMediaElement = (kind) => {
-    if (kind === 'image') {
-      return document.createElement('img');
-    }
-
+  const createNativeMediaElement = (kind) => {
     if (kind === 'audio') {
       const audio = document.createElement('audio');
       audio.autoplay = true;
@@ -137,17 +134,146 @@
     return video;
   };
 
+  const waitForVidstackRuntime = () => {
+    if (window.customElements?.get('media-player')) {
+      return Promise.resolve(true);
+    }
+
+    if (vidstackReadyPromise) {
+      return vidstackReadyPromise;
+    }
+
+    vidstackReadyPromise = new Promise((resolve) => {
+      const timeoutAt = Date.now() + 4000;
+
+      const poll = () => {
+        if (window.customElements?.get('media-player')) {
+          resolve(true);
+          return;
+        }
+
+        if (Date.now() >= timeoutAt) {
+          resolve(false);
+          return;
+        }
+
+        setTimeout(poll, 40);
+      };
+
+      poll();
+    });
+
+    return vidstackReadyPromise;
+  };
+
+  const createVidstackPlayer = (kind, mediaUrl) => {
+    const player = document.createElement('media-player');
+    player.className = 'overlay-media-player';
+    player.setAttribute('src', mediaUrl);
+    player.setAttribute('load', 'eager');
+    player.setAttribute('stream-type', 'on-demand');
+    player.setAttribute('playsinline', '');
+    player.setAttribute('autoplay', '');
+    player.setAttribute('crossorigin', '');
+    player.setAttribute('view-type', kind === 'audio' ? 'audio' : 'video');
+
+    const provider = document.createElement('media-provider');
+    player.appendChild(provider);
+
+    return player;
+  };
+
+  const createMediaElement = async (kind, mediaUrl) => {
+    if (kind === 'image') {
+      const image = document.createElement('img');
+      image.src = mediaUrl;
+      return image;
+    }
+
+    const canUseVidstack = await waitForVidstackRuntime();
+
+    if (!canUseVidstack) {
+      const fallback = createNativeMediaElement(kind);
+      fallback.src = mediaUrl;
+      return fallback;
+    }
+
+    return createVidstackPlayer(kind, mediaUrl);
+  };
+
   const applyVolume = () => {
-    const mediaElements = mediaLayer.querySelectorAll('audio,video');
+    const mediaElements = mediaLayer.querySelectorAll('audio,video,media-player');
     mediaElements.forEach((element) => {
-      element.volume = overlayConfig.volume;
-      element.muted = false;
+      try {
+        element.volume = overlayConfig.volume;
+      } catch (_error) {
+        // Ignore elements without volume property.
+      }
+
+      try {
+        element.muted = false;
+      } catch (_error) {
+        // Ignore elements without muted property.
+      }
     });
   };
 
+  const normalizeOrigin = (url) => {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return null;
+    }
+  };
+
+  const isOverlayTempPath = (pathname) => {
+    return pathname === '/overlay/temp' || pathname.startsWith('/overlay/temp/');
+  };
+
+  const shouldAppendToken = (url) => {
+    if (!overlayConfig.clientToken) {
+      return false;
+    }
+
+    try {
+      if (url.startsWith('/overlay/temp/')) {
+        return true;
+      }
+
+      const parsedMediaUrl = new URL(url, overlayConfig.serverUrl || undefined);
+
+      if (!isOverlayTempPath(parsedMediaUrl.pathname)) {
+        return false;
+      }
+
+      if (!overlayConfig.serverUrl) {
+        return true;
+      }
+
+      const serverOrigin = normalizeOrigin(overlayConfig.serverUrl);
+      return !!serverOrigin && parsedMediaUrl.origin === serverOrigin;
+    } catch {
+      return false;
+    }
+  };
+
   const buildAuthorizedMediaUrl = (url) => {
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}token=${encodeURIComponent(overlayConfig.clientToken)}`;
+    if (!shouldAppendToken(url)) {
+      return url;
+    }
+
+    try {
+      const parsed = new URL(url, overlayConfig.serverUrl || undefined);
+
+      if (!parsed.searchParams.has('token')) {
+        parsed.searchParams.set('token', overlayConfig.clientToken);
+      }
+
+      return parsed.toString();
+    } catch {
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}token=${encodeURIComponent(overlayConfig.clientToken)}`;
+    }
   };
 
   const ensureTwitterWidgets = async () => {
@@ -223,15 +349,16 @@
     }
 
     const mediaUrl = buildAuthorizedMediaUrl(payload.media.url);
-    const element = createMediaElement(payload.media.kind);
-    element.src = mediaUrl;
+    const element = await createMediaElement(payload.media.kind, mediaUrl);
     mediaLayer.appendChild(element);
 
     applyVolume();
 
     if (payload.media.kind !== 'image') {
       try {
-        await element.play();
+        if (typeof element.play === 'function') {
+          await element.play();
+        }
       } catch (error) {
         console.error('Autoplay failed:', error);
       }
