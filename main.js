@@ -554,7 +554,13 @@ function updateTrayMenu() {
   template.push({ type: 'separator' });
 
   template.push({
-    label: 'Recharger (Shift+Echap)',
+    label: 'Stopper média (Shift+Echap)',
+    enabled: cfg.enabled && !!overlayWindow && !overlayWindow.isDestroyed(),
+    click: () => stopCurrentPlayback(),
+  });
+
+  template.push({
+    label: 'Recharger overlay',
     enabled: cfg.enabled && !!overlayWindow && !overlayWindow.isDestroyed(),
     click: () => overlayWindow && overlayWindow.reload(),
   });
@@ -584,13 +590,21 @@ function createTray() {
   screen.on('display-metrics-changed', updateTrayMenu);
 }
 
+function stopCurrentPlayback() {
+  const cfg = loadConfig();
+
+  if (!cfg.enabled || !overlayWindow || overlayWindow.isDestroyed()) {
+    return;
+  }
+
+  overlayWindow.webContents.send('overlay:stop', {
+    reason: 'manual_stop',
+  });
+}
+
 function registerShortcuts() {
   globalShortcut.register('Shift+Escape', () => {
-    const cfg = loadConfig();
-
-    if (cfg.enabled && overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.reload();
-    }
+    stopCurrentPlayback();
   });
 }
 
